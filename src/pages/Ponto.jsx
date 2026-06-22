@@ -9,11 +9,17 @@ import {
   getRegistrosHoje,
   proximoTipoPonto,
   registrarPonto,
-  TIPO_LABELS,
   TIPOS_BATIDA,
 } from "../lib/supabase";
 
-// gps → matricula → confirmar (escolhe tipo) → registrar → sucesso
+const LABELS_PONTO = {
+  entrada: "Entrada",
+  intervalo_inicio: "Início de intervalo",
+  intervalo_fim: "Fim de intervalo",
+  saida: "Saída",
+};
+
+// gps → matricula → confirmar → sucesso
 export default function Ponto() {
   const navigate = useNavigate();
   const [etapa, setEtapa] = useState("gps");
@@ -85,6 +91,17 @@ export default function Ponto() {
     }
   }
 
+  function voltarMatricula() {
+    setColaborador(null);
+    setTipoSelecionado("entrada");
+    setTipoSugerido(null);
+    setRegistrosHoje([]);
+    setMatriculaInput("");
+    setAviso(null);
+    setErro(null);
+    setEtapa("matricula");
+  }
+
   function voltarInicio() {
     navigate("/");
   }
@@ -102,7 +119,7 @@ export default function Ponto() {
     setUltimoSucesso(null);
   }
 
-  async function handleConfirmarPonto() {
+  async function handleBaterPonto() {
     if (!colaborador || !geoDados || !tipoSelecionado) return;
 
     setRegistrando(true);
@@ -129,13 +146,6 @@ export default function Ponto() {
       setRegistrando(false);
     }
   }
-
-  const tipoBtn =
-    tipoSelecionado === "entrada"
-      ? "btn-success"
-      : tipoSelecionado === "saida"
-        ? "btn-danger"
-        : "btn-warning";
 
   return (
     <div className="page">
@@ -200,15 +210,15 @@ export default function Ponto() {
 
       {etapa === "confirmar" && colaborador && (
         <>
+          {geoDados && (
+            <div className="card">
+              <span className="status status-ok">✓ {geoDados.local.nome}</span>
+            </div>
+          )}
+
           <div className="card" style={{ textAlign: "center", padding: "1.5rem" }}>
-            <p className="list-item-meta">Confirme seus dados</p>
+            <p className="list-item-meta">Colaborador</p>
             <h2 style={{ fontSize: "1.5rem", margin: "0.5rem 0" }}>{colaborador.nome}</h2>
-            <p className="page-subtitle">Mat. {colaborador.matricula}</p>
-            {geoDados && (
-              <p className="list-item-meta" style={{ marginTop: "0.5rem" }}>
-                Local: {geoDados.local.nome}
-              </p>
-            )}
           </div>
 
           {registrosHoje.length > 0 && (
@@ -216,19 +226,19 @@ export default function Ponto() {
               <div className="card-title">Batidas de hoje</div>
               {registrosHoje.map((r) => (
                 <div key={r.id} className="list-item-meta">
-                  {TIPO_LABELS[r.tipo]} — {format(parseISO(r.timestamp), "HH:mm:ss")}
+                  {LABELS_PONTO[r.tipo]} — {format(parseISO(r.timestamp), "HH:mm:ss")}
                 </div>
               ))}
             </div>
           )}
 
           <div className="card">
-            <div className="card-title">Tipo de batida</div>
-            <p className="list-item-meta" style={{ marginBottom: "0.75rem" }}>
-              {tipoSugerido
-                ? `Sugerido: ${TIPO_LABELS[tipoSugerido]}. Altere se estiver errado.`
-                : "Escolha o tipo correto para esta batida."}
-            </p>
+            <div className="card-title">Tipo de registro</div>
+            {tipoSugerido && (
+              <p className="list-item-meta" style={{ marginBottom: "0.75rem" }}>
+                Sugerido: {LABELS_PONTO[tipoSugerido]}. Altere se necessário.
+              </p>
+            )}
             <div className="form-group" style={{ marginBottom: 0 }}>
               <select
                 className="select"
@@ -237,65 +247,29 @@ export default function Ponto() {
               >
                 {TIPOS_BATIDA.map((t) => (
                   <option key={t} value={t}>
-                    {TIPO_LABELS[t]}
+                    {LABELS_PONTO[t]}
                   </option>
                 ))}
               </select>
             </div>
           </div>
 
-          <button type="button" className={`btn ${tipoBtn}`} onClick={() => setEtapa("registrar")}>
-            Continuar
+          <button
+            type="button"
+            className="btn btn-success"
+            disabled={registrando}
+            onClick={handleBaterPonto}
+          >
+            {registrando ? "Registrando…" : "Bater ponto"}
           </button>
           <button
             type="button"
-            className="btn btn-secondary"
+            className="btn btn-danger"
             style={{ marginTop: "0.75rem" }}
-            onClick={() => {
-              setColaborador(null);
-              setTipoSelecionado("entrada");
-              setTipoSugerido(null);
-              setRegistrosHoje([]);
-              setMatriculaInput("");
-              setAviso(null);
-              setEtapa("matricula");
-            }}
+            disabled={registrando}
+            onClick={voltarMatricula}
           >
             Não sou eu
-          </button>
-        </>
-      )}
-
-      {etapa === "registrar" && colaborador && (
-        <>
-          <div className="card">
-            <div className="card-title">Confirmar registro</div>
-            <p style={{ fontSize: "1.125rem", fontWeight: 600 }}>{colaborador.nome}</p>
-            <p className="list-item-meta">Mat. {colaborador.matricula}</p>
-            <p style={{ marginTop: "0.75rem", fontSize: "1.25rem", fontWeight: 700 }}>
-              {TIPO_LABELS[tipoSelecionado]}
-            </p>
-            {geoDados && (
-              <p className="list-item-meta" style={{ marginTop: "0.5rem" }}>
-                Local: {geoDados.local.nome}
-              </p>
-            )}
-          </div>
-          <button
-            type="button"
-            className={`btn ${tipoBtn}`}
-            disabled={registrando}
-            onClick={handleConfirmarPonto}
-          >
-            {registrando ? "Registrando…" : "Confirmar ponto"}
-          </button>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            style={{ marginTop: "0.75rem" }}
-            onClick={() => setEtapa("confirmar")}
-          >
-            Voltar
           </button>
         </>
       )}
@@ -303,7 +277,7 @@ export default function Ponto() {
       {etapa === "sucesso" && ultimoSucesso && (
         <>
           <div className={`feedback-ponto ${ultimoSucesso.tipo}`}>
-            <h2>{TIPO_LABELS[ultimoSucesso.tipo]}</h2>
+            <h2>{LABELS_PONTO[ultimoSucesso.tipo]}</h2>
             <p>{ultimoSucesso.nome}</p>
             <p>Registrado às {ultimoSucesso.horario}</p>
           </div>
