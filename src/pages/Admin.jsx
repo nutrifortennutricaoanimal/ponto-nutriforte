@@ -3,7 +3,6 @@ import { Link, useNavigate } from "react-router-dom";
 import { format, parseISO } from "date-fns";
 import {
   supabase,
-  TIPO_LABELS,
   buscarRegistrosPeriodo,
   getJornadasMap,
   getCalendarioDias,
@@ -13,6 +12,8 @@ import {
   MSG_MIGRACAO_PENDENTE,
   isTabelaInexistente,
 } from "../lib/supabase";
+import { labelTipoBatida, TIPOS_BATIDA } from "../lib/tipoBatida";
+import SecaoColaboradores from "../components/SecaoColaboradores";
 import { getPosicaoAtual } from "../lib/geo";
 import { calcularSaldoPeriodo } from "../lib/horasExtras";
 import {
@@ -26,7 +27,6 @@ import {
 import {
   montarLinhasRegistros,
   formatarHoraRegistro,
-  TIPOS_BATIDA,
 } from "../lib/registrosPivot";
 import {
   DIAS_SEMANA_OPCOES,
@@ -35,7 +35,7 @@ import {
   normalizarDiasSemana,
 } from "../lib/diasUteis";
 
-const ABAS = ["registros", "horas", "locais", "jornadas", "calendario"];
+const ABAS = ["registros", "colaboradores", "horas", "locais", "jornadas", "calendario"];
 
 const STATUS_LABELS = {
   ausente: "Ausente",
@@ -51,7 +51,7 @@ function CelulaBatida({ registro, onEditar, onCriar, tipo, linha }) {
           type="button"
           className="celula-btn"
           onClick={() => onEditar(registro, linha)}
-          title={registro.editado_em ? "Registro editado" : undefined}
+          title={labelTipoBatida(registro.tipo)}
         >
           {formatarHoraRegistro(registro)}
           {registro.editado_em && <span className="badge-editado">✎</span>}
@@ -61,7 +61,7 @@ function CelulaBatida({ registro, onEditar, onCriar, tipo, linha }) {
   }
 
   return (
-    <td className="td-batida vazia">
+    <td className="td-batida vazia" title={labelTipoBatida(tipo)}>
       <button
         type="button"
         className="celula-btn celula-criar"
@@ -189,7 +189,7 @@ function ModalRegistro({ modal, onFechar, onSalvo, colaboradoresLista = [] }) {
             <select className="select" value={tipo} onChange={(e) => setTipo(e.target.value)}>
               {TIPOS_BATIDA.map((t) => (
                 <option key={t} value={t}>
-                  {TIPO_LABELS[t]}
+                  {labelTipoBatida(t)}
                 </option>
               ))}
             </select>
@@ -253,7 +253,7 @@ function ModalRegistro({ modal, onFechar, onSalvo, colaboradoresLista = [] }) {
                     {h.motivo && <p className="list-item-meta">{h.motivo}</p>}
                     {h.dados_anteriores && (
                       <p className="list-item-meta">
-                        Antes: {TIPO_LABELS[h.dados_anteriores.tipo]} às{" "}
+                        Antes: {labelTipoBatida(h.dados_anteriores.tipo)} às{" "}
                         {format(parseISO(h.dados_anteriores.timestamp), "HH:mm")}
                       </p>
                     )}
@@ -414,12 +414,11 @@ function SecaoRegistros() {
               <tr>
                 <th>Data</th>
                 <th>Colaborador</th>
-                <th>Entrada</th>
-                <th>Int. início</th>
-                <th>Int. fim</th>
-                <th>Saída</th>
+                <th>{labelTipoBatida("entrada")}</th>
+                <th>{labelTipoBatida("intervalo_inicio")}</th>
+                <th>{labelTipoBatida("intervalo_fim")}</th>
+                <th>{labelTipoBatida("saida")}</th>
                 <th>Status</th>
-                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -445,23 +444,6 @@ function SecaoRegistros() {
                       {STATUS_LABELS[linha.status]}
                     </span>
                   </td>
-                  <td>
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-sm"
-                      title="Adicionar batida neste dia"
-                      onClick={() =>
-                        setModal({
-                          modo: "criar",
-                          tipo: "entrada",
-                          colaboradorId: linha.colaborador_id,
-                          linha,
-                        })
-                      }
-                    >
-                      +
-                    </button>
-                  </td>
                 </tr>
               ))}
             </tbody>
@@ -470,7 +452,7 @@ function SecaoRegistros() {
       </div>
 
       <p className="list-item-meta" style={{ marginTop: "0.75rem" }}>
-        Use <strong>+ Adicionar batida</strong>, o botão <strong>+</strong> na linha, ou toque em <strong>—</strong> / hora na tabela.
+        Toque em <strong>—</strong> para incluir batida ou na <strong>hora</strong> para editar. Use <strong>+ Adicionar batida</strong> para cadastro avulso.
       </p>
 
       <ModalRegistro
@@ -1086,10 +1068,6 @@ export default function Admin() {
         </button>
       </div>
 
-      <Link to="/cadastro" className="btn btn-primary btn-sm" style={{ marginBottom: "1rem", display: "inline-flex" }}>
-        + Cadastrar colaborador
-      </Link>
-
       <div className="tabs">
         {ABAS.map((a) => (
           <button
@@ -1099,6 +1077,7 @@ export default function Admin() {
             onClick={() => setAba(a)}
           >
             {a === "registros" && "Registros"}
+            {a === "colaboradores" && "Colaboradores"}
             {a === "horas" && "Horas extras"}
             {a === "locais" && "Locais"}
             {a === "jornadas" && "Jornadas"}
@@ -1108,6 +1087,7 @@ export default function Admin() {
       </div>
 
       {aba === "registros" && <SecaoRegistros />}
+      {aba === "colaboradores" && <SecaoColaboradores />}
       {aba === "horas" && <SecaoHoras />}
       {aba === "locais" && <SecaoLocais />}
       {aba === "jornadas" && <SecaoJornadas />}
