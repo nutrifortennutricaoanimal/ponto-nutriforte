@@ -1,9 +1,9 @@
 import { TIPOS_BATIDA, TIPO_ICONES, TIPO_LABELS } from "../lib/tipoBatida";
 
-export default function TipoBatidaOpcoes({ value, onChange, grande = false }) {
+export default function TipoBatidaOpcoes({ value, onChange, grande = false, tipos = TIPOS_BATIDA }) {
   return (
     <div className={`tipo-batida-opcoes${grande ? " tipo-batida-opcoes-grande" : ""}`}>
-      {TIPOS_BATIDA.map((tipo) => (
+      {tipos.map((tipo) => (
         <button
           key={tipo}
           type="button"

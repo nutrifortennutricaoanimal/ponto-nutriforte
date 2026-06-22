@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { format, parseISO } from "date-fns";
 import GeoCheck from "../components/GeoCheck";
@@ -6,13 +6,16 @@ import TipoBatidaOpcoes from "../components/TipoBatidaOpcoes";
 import { formatarData } from "../lib/dates";
 import {
   getColaboradorByMatricula,
-  getUltimoRegistroHoje,
   getRegistrosHoje,
-  proximoTipoPonto,
   registrarPonto,
   RegistroBloqueadoError,
 } from "../lib/supabase";
 import { formatTipoBatida } from "../lib/tipoBatida";
+import {
+  tiposPermitidos,
+  tipoSugerido,
+  isErroValidacaoPonto,
+} from "../lib/validacaoPonto";
 
 // gps → matricula → confirmar → sucesso
 export default function Ponto() {
@@ -24,7 +27,6 @@ export default function Ponto() {
   const [geoDados, setGeoDados] = useState(null);
   const [colaborador, setColaborador] = useState(null);
   const [tipoSelecionado, setTipoSelecionado] = useState("entrada");
-  const [tipoSugerido, setTipoSugerido] = useState(null);
   const [registrosHoje, setRegistrosHoje] = useState([]);
   const [registrando, setRegistrando] = useState(false);
   const [erroBloqueado, setErroBloqueado] = useState(null);
@@ -32,10 +34,27 @@ export default function Ponto() {
   const [matriculaInput, setMatriculaInput] = useState("");
   const [buscandoMatricula, setBuscandoMatricula] = useState(false);
 
+  const tiposDisponiveis = useMemo(
+    () => tiposPermitidos(registrosHoje),
+    [registrosHoje]
+  );
+  const sugerido = useMemo(() => tipoSugerido(registrosHoje), [registrosHoje]);
+
   useEffect(() => {
     const id = setInterval(() => setAgora(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    if (etapa !== "confirmar") return;
+    if (tiposDisponiveis.length === 0) {
+      setTipoSelecionado("");
+      return;
+    }
+    if (!tiposDisponiveis.includes(tipoSelecionado)) {
+      setTipoSelecionado(sugerido || tiposDisponiveis[0]);
+    }
+  }, [etapa, tiposDisponiveis, sugerido, tipoSelecionado]);
 
   const handleGeo = useCallback((resultado) => {
     if (resultado.ok && etapa === "gps") {
@@ -56,27 +75,23 @@ export default function Ponto() {
     setBuscandoMatricula(true);
     setErro(null);
     setAviso(null);
+    setErroBloqueado(null);
 
     try {
       const colab = await getColaboradorByMatricula(matriculaInput.trim());
       if (!colab) throw new Error("Matrícula não encontrada.");
       if (colab.is_admin) throw new Error("Matrícula inválida para bater ponto.");
 
-      const [ultimo, hoje] = await Promise.all([
-        getUltimoRegistroHoje(colab.id),
-        getRegistrosHoje(colab.id),
-      ]);
+      const hoje = await getRegistrosHoje(colab.id);
+      const permitidos = tiposPermitidos(hoje);
+      const sug = tipoSugerido(hoje);
 
-      const sugerido = proximoTipoPonto(ultimo);
       setColaborador(colab);
       setRegistrosHoje(hoje);
-      setTipoSugerido(sugerido);
-      setTipoSelecionado(sugerido || "entrada");
+      setTipoSelecionado(sug || permitidos[0] || "");
 
-      if (!sugerido) {
-        setAviso("Jornada do dia parece concluída. Escolha o tipo de batida abaixo se precisar registrar outra.");
-      } else if (sugerido !== "entrada" && !hoje.some((r) => r.tipo === "entrada")) {
-        setAviso("Não há entrada registrada hoje. Confira o tipo de batida antes de confirmar.");
+      if (permitidos.length === 0) {
+        setAviso("Seu ponto de hoje já foi encerrado com a saída.");
       }
 
       setEtapa("confirmar");
@@ -90,11 +105,11 @@ export default function Ponto() {
   function voltarMatricula() {
     setColaborador(null);
     setTipoSelecionado("entrada");
-    setTipoSugerido(null);
     setRegistrosHoje([]);
     setMatriculaInput("");
     setAviso(null);
     setErro(null);
+    setErroBloqueado(null);
     setEtapa("matricula");
   }
 
@@ -106,11 +121,11 @@ export default function Ponto() {
     setEtapa("gps");
     setColaborador(null);
     setTipoSelecionado("entrada");
-    setTipoSugerido(null);
     setRegistrosHoje([]);
     setGeoDados(null);
     setErro(null);
     setAviso(null);
+    setErroBloqueado(null);
     setMatriculaInput("");
     setUltimoSucesso(null);
   }
@@ -138,7 +153,7 @@ export default function Ponto() {
       });
       setEtapa("sucesso");
     } catch (e) {
-      if (e instanceof RegistroBloqueadoError) {
+      if (e instanceof RegistroBloqueadoError || isErroValidacaoPonto(e)) {
         setErroBloqueado(e.message);
       } else {
         setErro(e.message || "Erro ao registrar ponto.");
@@ -147,6 +162,8 @@ export default function Ponto() {
       setRegistrando(false);
     }
   }
+
+  const diaEncerrado = tiposDisponiveis.length === 0;
 
   return (
     <div className="page">
@@ -233,15 +250,22 @@ export default function Ponto() {
             </div>
           )}
 
-          <div className="card">
-            <div className="card-title">Tipo de registro</div>
-            {tipoSugerido && (
-              <p className="list-item-meta" style={{ marginBottom: "0.75rem" }}>
-                Sugerido: {formatTipoBatida(tipoSugerido)}. Toque para alterar se necessário.
-              </p>
-            )}
-            <TipoBatidaOpcoes value={tipoSelecionado} onChange={setTipoSelecionado} grande />
-          </div>
+          {!diaEncerrado && (
+            <div className="card">
+              <div className="card-title">Tipo de registro</div>
+              {sugerido && (
+                <p className="list-item-meta" style={{ marginBottom: "0.75rem" }}>
+                  Sugerido: {formatTipoBatida(sugerido)}. Toque para alterar se necessário.
+                </p>
+              )}
+              <TipoBatidaOpcoes
+                value={tipoSelecionado}
+                onChange={setTipoSelecionado}
+                tipos={tiposDisponiveis}
+                grande
+              />
+            </div>
+          )}
 
           {erroBloqueado && (
             <div className="msg-aviso-bloqueado">
@@ -250,14 +274,16 @@ export default function Ponto() {
             </div>
           )}
 
-          <button
-            type="button"
-            className="btn btn-success"
-            disabled={registrando}
-            onClick={handleBaterPonto}
-          >
-            {registrando ? "Registrando…" : "Bater ponto"}
-          </button>
+          {!diaEncerrado && (
+            <button
+              type="button"
+              className="btn btn-success"
+              disabled={registrando || !tipoSelecionado}
+              onClick={handleBaterPonto}
+            >
+              {registrando ? "Registrando…" : "Bater ponto"}
+            </button>
+          )}
           <button
             type="button"
             className="btn btn-danger"

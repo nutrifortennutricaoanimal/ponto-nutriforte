@@ -1,8 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 
-import { startOfDay, endOfDay } from "date-fns";
+import { startOfDay, endOfDay, parseISO } from "date-fns";
 
 import { parseData } from "./dates";
+import { validarBatida } from "./validacaoPonto";
 
 
 
@@ -218,6 +219,23 @@ export {
   iconeTipoBatida,
 };
 
+export async function getRegistrosColaboradorDia(colaboradorId, dataRef) {
+  const dia = dataRef instanceof Date ? dataRef : parseISO(dataRef);
+  const inicio = startOfDay(dia).toISOString();
+  const fim = endOfDay(dia).toISOString();
+
+  const { data, error } = await supabase
+    .from("registros_ponto")
+    .select("*")
+    .eq("colaborador_id", colaboradorId)
+    .gte("timestamp", inicio)
+    .lte("timestamp", fim)
+    .order("timestamp", { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
 export function proximoTipoPonto(ultimoRegistro) {
   if (!ultimoRegistro) return "entrada";
   const mapa = {
@@ -274,6 +292,9 @@ export async function registrarPonto({
 
   if (errCheck) throw errCheck;
   if (existentes?.length > 0) throw new RegistroBloqueadoError(tipo);
+
+  const registros = await getRegistrosHoje(colaboradorId);
+  validarBatida({ registros, tipo, timestamp: new Date() });
 
   const { data, error } = await supabase
     .from("registros_ponto")
@@ -393,6 +414,14 @@ export async function salvarRegistroManual({
   adminId,
 
 }) {
+
+  const registros = await getRegistrosColaboradorDia(colaboradorId, timestamp);
+  validarBatida({
+    registros,
+    tipo,
+    timestamp,
+    ignorarRegistroId: modo === "editar" ? registroId : undefined,
+  });
 
   if (modo === "criar") {
 
