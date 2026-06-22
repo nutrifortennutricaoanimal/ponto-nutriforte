@@ -232,6 +232,16 @@ export async function criarUsuarioAuth(email, senha) {
   return data.user_id;
 }
 
+export class RegistroBloqueadoError extends Error {
+  constructor(tipo) {
+    super(
+      `Seu registro de ${labelTipoBatida(tipo)} já foi ajustado pelo administrador. Procure o RH em caso de dúvida.`
+    );
+    this.name = "RegistroBloqueadoError";
+    this.tipo = tipo;
+  }
+}
+
 export async function registrarPonto({
   colaboradorId,
   tipo,
@@ -239,6 +249,22 @@ export async function registrarPonto({
   longitude,
   localId,
 }) {
+  const hoje = new Date();
+  const inicio = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()).toISOString();
+  const fim = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 23, 59, 59, 999).toISOString();
+
+  const { data: existente } = await supabase
+    .from("registros_ponto")
+    .select("id, status")
+    .eq("colaborador_id", colaboradorId)
+    .eq("tipo", tipo)
+    .eq("status", "manual")
+    .gte("timestamp", inicio)
+    .lte("timestamp", fim)
+    .maybeSingle();
+
+  if (existente) throw new RegistroBloqueadoError(tipo);
+
   const { data, error } = await supabase
     .from("registros_ponto")
     .insert({

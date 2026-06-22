@@ -43,6 +43,7 @@ const STATUS_LABELS = {
 
 function CelulaBatida({ registro, onEditar, onCriar, tipo, linha }) {
   if (registro) {
+    const nomeLocal = registro.locais_trabalho?.nome || null;
     return (
       <td className={`td-batida ${registro.editado_em ? "editado" : ""}`}>
         <button
@@ -53,6 +54,9 @@ function CelulaBatida({ registro, onEditar, onCriar, tipo, linha }) {
         >
           {formatarHoraRegistro(registro)}
           {registro.editado_em && <span className="badge-editado">✎</span>}
+          {nomeLocal && (
+            <span className="celula-local">📍 {nomeLocal}</span>
+          )}
         </button>
       </td>
     );

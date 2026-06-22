@@ -10,6 +10,7 @@ import {
   getRegistrosHoje,
   proximoTipoPonto,
   registrarPonto,
+  RegistroBloqueadoError,
 } from "../lib/supabase";
 import { formatTipoBatida } from "../lib/tipoBatida";
 
@@ -26,6 +27,7 @@ export default function Ponto() {
   const [tipoSugerido, setTipoSugerido] = useState(null);
   const [registrosHoje, setRegistrosHoje] = useState([]);
   const [registrando, setRegistrando] = useState(false);
+  const [erroBloqueado, setErroBloqueado] = useState(null);
   const [ultimoSucesso, setUltimoSucesso] = useState(null);
   const [matriculaInput, setMatriculaInput] = useState("");
   const [buscandoMatricula, setBuscandoMatricula] = useState(false);
@@ -118,6 +120,7 @@ export default function Ponto() {
 
     setRegistrando(true);
     setErro(null);
+    setErroBloqueado(null);
 
     try {
       const registro = await registrarPonto({
@@ -135,7 +138,11 @@ export default function Ponto() {
       });
       setEtapa("sucesso");
     } catch (e) {
-      setErro(e.message || "Erro ao registrar ponto.");
+      if (e instanceof RegistroBloqueadoError) {
+        setErroBloqueado(e.message);
+      } else {
+        setErro(e.message || "Erro ao registrar ponto.");
+      }
     } finally {
       setRegistrando(false);
     }
@@ -235,6 +242,13 @@ export default function Ponto() {
             )}
             <TipoBatidaOpcoes value={tipoSelecionado} onChange={setTipoSelecionado} grande />
           </div>
+
+          {erroBloqueado && (
+            <div className="msg-aviso-bloqueado">
+              <span style={{ fontSize: "1.25rem" }}>🔒</span>
+              <span>{erroBloqueado}</span>
+            </div>
+          )}
 
           <button
             type="button"

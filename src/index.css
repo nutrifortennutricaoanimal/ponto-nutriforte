@@ -594,6 +594,31 @@ a {
   max-width: 4.5rem;
 }
 
+.celula-local {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--cinza-500, #6b7280);
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 7rem;
+}
+
+.msg-aviso-bloqueado {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  border-radius: var(--raio, 0.5rem);
+  padding: 0.875rem 1rem;
+  color: #9a3412;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  margin-bottom: 0.75rem;
+}
+
 /* Jornada: tabela de dias */
 .jornada-dias-tabela {
   display: flex;
