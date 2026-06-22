@@ -113,13 +113,16 @@ export async function calcularHorasExtras(colaboradorId, data) {
     ? parseISO(porTipo.intervalo_fim.timestamp)
     : null;
 
+  const horarioPrevisto = horarioPrevistoDia(jornada, dataRef, calendarioDias);
+  const intervaloPrevistoMin = horarioPrevisto?.intervalo ?? jornada?.intervalo_minutos ?? 0;
+
   let horasTrabalhadasMin = 0;
   if (entrada && saida) {
     const total = minutosEntre(entrada, saida);
     const intervalo =
       intervaloInicio && intervaloFim
         ? minutosEntre(intervaloInicio, intervaloFim)
-        : jornada?.intervalo_minutos || 0;
+        : intervaloPrevistoMin;
     horasTrabalhadasMin = Math.max(0, total - intervalo);
   }
 

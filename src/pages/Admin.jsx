@@ -29,9 +29,7 @@ import {
   formatarHoraRegistro,
 } from "../lib/registrosPivot";
 import {
-  DIAS_SEMANA_OPCOES,
   DIAS_SEMANA_PADRAO,
-  formatarDiasSemana,
   normalizarDiasSemana,
 } from "../lib/diasUteis";
 
@@ -711,20 +709,82 @@ function SecaoLocais() {
   );
 }
 
+const DIAS_JORNADA = [
+  { num: 1, label: "Segunda" },
+  { num: 2, label: "Terça" },
+  { num: 3, label: "Quarta" },
+  { num: 4, label: "Quinta" },
+  { num: 5, label: "Sexta" },
+  { num: 6, label: "Sábado" },
+  { num: 0, label: "Domingo" },
+];
+
+const DIAS_DEFAULT = {
+  0: { trabalha: false },
+  1: { trabalha: true, entrada: "08:00", saida: "17:00", intervalo: 60 },
+  2: { trabalha: true, entrada: "08:00", saida: "17:00", intervalo: 60 },
+  3: { trabalha: true, entrada: "08:00", saida: "17:00", intervalo: 60 },
+  4: { trabalha: true, entrada: "08:00", saida: "17:00", intervalo: 60 },
+  5: { trabalha: true, entrada: "08:00", saida: "17:00", intervalo: 60 },
+  6: { trabalha: true, entrada: "08:00", saida: "12:00", intervalo: 0 },
+};
+
+function diasDeBancoParaForm(diasBanco) {
+  const base = JSON.parse(JSON.stringify(DIAS_DEFAULT));
+  if (!diasBanco) return base;
+  for (const d of DIAS_JORNADA) {
+    const k = String(d.num);
+    if (diasBanco[k]) {
+      base[d.num] = {
+        trabalha: !!diasBanco[k].trabalha,
+        entrada: diasBanco[k].entrada || "08:00",
+        saida: diasBanco[k].saida || "17:00",
+        intervalo: diasBanco[k].intervalo ?? 0,
+      };
+    } else {
+      base[d.num] = { trabalha: false };
+    }
+  }
+  return base;
+}
+
+function diasParaBanco(dias) {
+  const obj = {};
+  for (const d of DIAS_JORNADA) {
+    const cfg = dias[d.num];
+    if (cfg?.trabalha) {
+      obj[String(d.num)] = {
+        trabalha: true,
+        entrada: cfg.entrada,
+        saida: cfg.saida,
+        intervalo: Number(cfg.intervalo) || 0,
+      };
+    } else {
+      obj[String(d.num)] = { trabalha: false };
+    }
+  }
+  return obj;
+}
+
+function resumoJornada(j) {
+  const dias = j.dias || {};
+  const partes = DIAS_JORNADA.filter((d) => {
+    const cfg = dias[String(d.num)];
+    return cfg?.trabalha;
+  }).map((d) => {
+    const cfg = dias[String(d.num)];
+    return `${d.label.slice(0, 3)}: ${cfg.entrada}–${cfg.saida}`;
+  });
+  return partes.length ? partes.join(" · ") : "Sem dias configurados";
+}
+
 function SecaoJornadas() {
   const [jornadas, setJornadas] = useState([]);
   const [editando, setEditando] = useState(null);
-  const [form, setForm] = useState({
-    nome: "Padrão",
-    hora_entrada: "08:00",
-    hora_saida: "17:00",
-    intervalo_minutos: "60",
-    sabado: true,
-    hora_entrada_sabado: "08:00",
-    hora_saida_sabado: "12:00",
-    dias_semana: [...DIAS_SEMANA_PADRAO],
-    ativo: true,
-  });
+  const [nome, setNome] = useState("");
+  const [dias, setDias] = useState(JSON.parse(JSON.stringify(DIAS_DEFAULT)));
+  const [erro, setErro] = useState(null);
+  const [salvando, setSalvando] = useState(false);
 
   async function carregar() {
     const { data } = await supabase.from("jornadas").select("*").order("nome");
@@ -735,122 +795,184 @@ function SecaoJornadas() {
     carregar();
   }, []);
 
-  function editar(j) {
-    setEditando(j.id);
-    setForm({
-      nome: j.nome,
-      hora_entrada: j.hora_entrada?.slice(0, 5) || "08:00",
-      hora_saida: j.hora_saida?.slice(0, 5) || "17:00",
-      intervalo_minutos: String(j.intervalo_minutos),
-      sabado: j.sabado,
-      hora_entrada_sabado: j.hora_entrada_sabado?.slice(0, 5) || "08:00",
-      hora_saida_sabado: j.hora_saida_sabado?.slice(0, 5) || "12:00",
-      dias_semana: normalizarDiasSemana(j),
-      ativo: j.ativo,
-    });
+  function novaJornada() {
+    setEditando("novo");
+    setNome("");
+    setDias(JSON.parse(JSON.stringify(DIAS_DEFAULT)));
+    setErro(null);
   }
 
-  function toggleDia(dia) {
-    setForm((f) => {
-      const dias = f.dias_semana.includes(dia)
-        ? f.dias_semana.filter((d) => d !== dia)
-        : [...f.dias_semana, dia].sort((a, b) => a - b);
-      return { ...f, dias_semana: dias, sabado: dias.includes(6) };
-    });
+  function editarJornada(j) {
+    setEditando(j.id);
+    setNome(j.nome);
+    setDias(diasDeBancoParaForm(j.dias));
+    setErro(null);
+  }
+
+  function setDia(num, campo, valor) {
+    setDias((prev) => ({
+      ...prev,
+      [num]: { ...prev[num], [campo]: valor },
+    }));
   }
 
   async function salvar(e) {
     e.preventDefault();
-    const payload = {
-      nome: form.nome,
-      hora_entrada: form.hora_entrada,
-      hora_saida: form.hora_saida,
-      intervalo_minutos: Number(form.intervalo_minutos),
-      sabado: form.dias_semana.includes(6),
-      hora_entrada_sabado: form.hora_entrada_sabado,
-      hora_saida_sabado: form.hora_saida_sabado,
-      dias_semana: form.dias_semana,
-      ativo: form.ativo,
-    };
-    await supabase.from("jornadas").update(payload).eq("id", editando);
-    setEditando(null);
+    setSalvando(true);
+    setErro(null);
+
+    try {
+      if (!nome.trim()) throw new Error("Informe o nome da jornada.");
+
+      const payload = {
+        nome: nome.trim(),
+        dias: diasParaBanco(dias),
+        dias_semana: DIAS_JORNADA.filter((d) => dias[d.num]?.trabalha).map((d) => d.num),
+        sabado: !!dias[6]?.trabalha,
+        hora_entrada: dias[1]?.trabalha ? dias[1].entrada : null,
+        hora_saida: dias[1]?.trabalha ? dias[1].saida : null,
+        intervalo_minutos: dias[1]?.trabalha ? Number(dias[1].intervalo) : 0,
+        hora_entrada_sabado: dias[6]?.trabalha ? dias[6].entrada : null,
+        hora_saida_sabado: dias[6]?.trabalha ? dias[6].saida : null,
+      };
+
+      if (editando === "novo") {
+        const { error: insertError } = await supabase.from("jornadas").insert({ ...payload, ativo: true });
+        if (insertError) throw insertError;
+      } else {
+        const { error: updateError } = await supabase.from("jornadas").update(payload).eq("id", editando);
+        if (updateError) throw updateError;
+      }
+
+      setEditando(null);
+      carregar();
+    } catch (err) {
+      setErro(err.message || "Erro ao salvar jornada.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  async function toggleAtivo(j) {
+    const novo = !j.ativo;
+    if (!novo && !confirm(`Desativar jornada "${j.nome}"? Não aparecerá ao cadastrar colaboradores.`)) return;
+    const { error: toggleError } = await supabase.from("jornadas").update({ ativo: novo }).eq("id", j.id);
+    if (toggleError) { setErro(toggleError.message); return; }
     carregar();
   }
 
   return (
     <div>
-      {jornadas.map((j) => (
-        <div key={j.id} className="card">
-          {editando === j.id ? (
-            <form onSubmit={salvar}>
-              <div className="form-group">
-                <label>Nome</label>
-                <input className="input" value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} />
-              </div>
-              <div className="form-group">
-                <label>Dias úteis da semana</label>
-                <div className="dias-semana-grid">
-                  {DIAS_SEMANA_OPCOES.map((d) => (
-                    <label key={d.valor} className="dia-checkbox">
-                      <input
-                        type="checkbox"
-                        checked={form.dias_semana.includes(d.valor)}
-                        onChange={() => toggleDia(d.valor)}
-                      />
-                      {d.label}
-                    </label>
-                  ))}
+      <button type="button" className="btn btn-primary btn-sm" onClick={novaJornada}>
+        + Nova jornada
+      </button>
+
+      {editando && (
+        <form onSubmit={salvar} className="card" style={{ marginTop: "1rem" }}>
+          <div className="card-title">{editando === "novo" ? "Nova jornada" : "Editar jornada"}</div>
+
+          {erro && <div className="msg-erro">{erro}</div>}
+
+          <div className="form-group">
+            <label>Nome da jornada</label>
+            <input
+              className="input"
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="jornada-dias-tabela">
+            <div className="jornada-dias-header">
+              <span>Dia</span>
+              <span>Não trabalha</span>
+              <span>Entrada</span>
+              <span>Saída</span>
+              <span>Intervalo (min)</span>
+            </div>
+            {DIAS_JORNADA.map((d) => {
+              const cfg = dias[d.num] || { trabalha: false };
+              const naoTrabalha = !cfg.trabalha;
+              return (
+                <div key={d.num} className={`jornada-dia-linha${naoTrabalha ? " nao-trabalha" : ""}`}>
+                  <span className="jornada-dia-nome">{d.label}</span>
+                  <span className="jornada-dia-check">
+                    <input
+                      type="checkbox"
+                      checked={naoTrabalha}
+                      onChange={(e) => setDia(d.num, "trabalha", !e.target.checked)}
+                    />
+                  </span>
+                  <input
+                    type="time"
+                    className="input input-sm"
+                    value={cfg.entrada || "08:00"}
+                    disabled={naoTrabalha}
+                    onChange={(e) => setDia(d.num, "entrada", e.target.value)}
+                  />
+                  <input
+                    type="time"
+                    className="input input-sm"
+                    value={cfg.saida || "17:00"}
+                    disabled={naoTrabalha}
+                    onChange={(e) => setDia(d.num, "saida", e.target.value)}
+                  />
+                  <input
+                    type="number"
+                    className="input input-sm"
+                    min="0"
+                    value={cfg.intervalo ?? 0}
+                    disabled={naoTrabalha}
+                    onChange={(e) => setDia(d.num, "intervalo", e.target.value)}
+                  />
                 </div>
+              );
+            })}
+          </div>
+
+          <div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem" }}>
+            <button type="submit" className="btn btn-primary btn-sm" disabled={salvando}>
+              {salvando ? "Salvando…" : "Salvar"}
+            </button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditando(null)}>
+              Cancelar
+            </button>
+          </div>
+        </form>
+      )}
+
+      {erro && !editando && <div className="msg-erro" style={{ marginTop: "1rem" }}>{erro}</div>}
+
+      <div className="card" style={{ marginTop: "1rem" }}>
+        {jornadas.length === 0 ? (
+          <p className="list-item-meta">Nenhuma jornada cadastrada.</p>
+        ) : (
+          jornadas.map((j) => (
+            <div key={j.id} className="list-item">
+              <div>
+                <strong>{j.nome}</strong>{" "}
+                <span className={`status ${j.ativo ? "status-ok" : "status-erro"}`}>
+                  {j.ativo ? "Ativa" : "Inativa"}
+                </span>
+                <div className="list-item-meta">{resumoJornada(j)}</div>
               </div>
-              <div className="grid-2">
-                <div className="form-group">
-                  <label>Entrada</label>
-                  <input type="time" className="input" value={form.hora_entrada} onChange={(e) => setForm({ ...form, hora_entrada: e.target.value })} />
-                </div>
-                <div className="form-group">
-                  <label>Saída</label>
-                  <input type="time" className="input" value={form.hora_saida} onChange={(e) => setForm({ ...form, hora_saida: e.target.value })} />
-                </div>
+              <div style={{ display: "flex", gap: "0.5rem", flexShrink: 0 }}>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => editarJornada(j)}>
+                  Editar
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${j.ativo ? "btn-danger" : "btn-success"}`}
+                  onClick={() => toggleAtivo(j)}
+                >
+                  {j.ativo ? "Desativar" : "Ativar"}
+                </button>
               </div>
-              <div className="form-group">
-                <label>Intervalo (min)</label>
-                <input type="number" className="input" value={form.intervalo_minutos} onChange={(e) => setForm({ ...form, intervalo_minutos: e.target.value })} />
-              </div>
-              {form.dias_semana.includes(6) && (
-                <div className="grid-2">
-                  <div className="form-group">
-                    <label>Entrada sáb.</label>
-                    <input type="time" className="input" value={form.hora_entrada_sabado} onChange={(e) => setForm({ ...form, hora_entrada_sabado: e.target.value })} />
-                  </div>
-                  <div className="form-group">
-                    <label>Saída sáb.</label>
-                    <input type="time" className="input" value={form.hora_saida_sabado} onChange={(e) => setForm({ ...form, hora_saida_sabado: e.target.value })} />
-                  </div>
-                </div>
-              )}
-              <button type="submit" className="btn btn-primary btn-sm">
-                Salvar
-              </button>
-              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditando(null)} style={{ marginLeft: "0.5rem" }}>
-                Cancelar
-              </button>
-            </form>
-          ) : (
-            <>
-              <strong>{j.nome}</strong>
-              <p className="list-item-meta">
-                Dias: {formatarDiasSemana(j)} · {j.hora_entrada?.slice(0, 5)}–{j.hora_saida?.slice(0, 5)} (intervalo{" "}
-                {j.intervalo_minutos}min)
-                {normalizarDiasSemana(j).includes(6) &&
-                  ` · Sáb: ${j.hora_entrada_sabado?.slice(0, 5)}–${j.hora_saida_sabado?.slice(0, 5)}`}
-              </p>
-              <button type="button" className="btn btn-secondary btn-sm" onClick={() => editar(j)}>
-                Editar
-              </button>
-            </>
-          )}
-        </div>
-      ))}
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }

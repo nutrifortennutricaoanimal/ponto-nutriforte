@@ -34,6 +34,12 @@ function dataIso(d) {
 }
 
 export function normalizarDiasSemana(jornada) {
+  if (jornada?.dias && typeof jornada.dias === "object") {
+    return Object.entries(jornada.dias)
+      .filter(([, cfg]) => cfg?.trabalha)
+      .map(([k]) => Number(k))
+      .sort((a, b) => a - b);
+  }
   if (jornada?.dias_semana?.length) {
     return [...jornada.dias_semana].sort((a, b) => a - b);
   }
@@ -78,14 +84,26 @@ export function horarioPrevistoDia(jornada, data, calendarioDias = []) {
 
   const excecao = excecaoParaDia(data, jornada, calendarioDias);
   if (excecao?.tipo === "dia_extra" && excecao.hora_entrada && excecao.hora_saida) {
+    const intervaloFallback = horarioPrevistoDia(jornada, data, [])?.intervalo || 0;
     return {
       entrada: excecao.hora_entrada.slice(0, 5),
       saida: excecao.hora_saida.slice(0, 5),
-      intervalo: jornada.intervalo_minutos || 0,
+      intervalo: intervaloFallback,
     };
   }
 
   const dia = getDay(resolverData(data));
+
+  if (jornada.dias && typeof jornada.dias === "object") {
+    const cfg = jornada.dias[String(dia)];
+    if (!cfg?.trabalha) return null;
+    return {
+      entrada: (cfg.entrada || "08:00").slice(0, 5),
+      saida: (cfg.saida || "17:00").slice(0, 5),
+      intervalo: Number(cfg.intervalo) || 0,
+    };
+  }
+
   if (dia === 6 && jornada.sabado) {
     return {
       entrada: (jornada.hora_entrada_sabado || "08:00").slice(0, 5),
