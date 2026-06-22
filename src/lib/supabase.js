@@ -200,88 +200,60 @@ export async function getRegistrosHoje(colaboradorId) {
   return data || [];
 }
 
-export const TIPOS_BATIDA = ["entrada", "intervalo_inicio", "intervalo_fim", "saida"];
+export {
+  TIPOS_BATIDA,
+  TIPO_LABELS,
+  TIPO_ICONES,
+  formatTipoBatida,
+  labelTipoBatida,
+  iconeTipoBatida,
+} from "./tipoBatida";
 
 export function proximoTipoPonto(ultimoRegistro) {
-
   if (!ultimoRegistro) return "entrada";
-
   const mapa = {
-
     entrada: "intervalo_inicio",
-
     intervalo_inicio: "intervalo_fim",
-
     intervalo_fim: "saida",
-
     saida: null,
-
   };
-
   return mapa[ultimoRegistro.tipo] ?? null;
-
 }
 
+export async function criarUsuarioAuth(email, senha) {
+  const { data, error } = await supabase.functions.invoke("criar-usuario", {
+    body: { email, senha },
+  });
 
+  if (error) throw new Error(error.message || "Erro ao criar usuário.");
+  if (data?.error) throw new Error(data.error);
+  if (!data?.user_id) throw new Error("Resposta inválida ao criar usuário.");
 
-export const TIPO_LABELS = {
-
-  entrada: "Entrada",
-
-  saida: "Saída",
-
-  intervalo_inicio: "Início do intervalo",
-
-  intervalo_fim: "Fim do intervalo",
-
-};
-
-
+  return data.user_id;
+}
 
 export async function registrarPonto({
-
   colaboradorId,
-
   tipo,
-
   latitude,
-
   longitude,
-
   localId,
-
 }) {
-
   const { data, error } = await supabase
-
     .from("registros_ponto")
-
     .insert({
-
       colaborador_id: colaboradorId,
-
       tipo,
-
       latitude,
-
       longitude,
-
       local_id: localId,
-
       status: "ok",
-
     })
-
     .select()
-
     .single();
 
-
-
   if (error) throw error;
-
   return data;
-
 }
 
 

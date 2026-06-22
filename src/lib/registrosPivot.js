@@ -1,8 +1,9 @@
 import { format, parseISO } from "date-fns";
 import { formatarData } from "./dates";
 import { listarDiasUteisNoPeriodo } from "./diasUteis";
+import { TIPOS_BATIDA } from "./tipoBatida";
 
-export const TIPOS_BATIDA = ["entrada", "intervalo_inicio", "intervalo_fim", "saida"];
+export { TIPOS_BATIDA };
 
 export function montarLinhasRegistros({
   colaboradores,

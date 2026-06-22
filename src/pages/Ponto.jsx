@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { format, parseISO } from "date-fns";
 import GeoCheck from "../components/GeoCheck";
+import TipoBatidaOpcoes from "../components/TipoBatidaOpcoes";
 import { formatarData } from "../lib/dates";
 import {
   getColaboradorByMatricula,
@@ -9,15 +10,8 @@ import {
   getRegistrosHoje,
   proximoTipoPonto,
   registrarPonto,
-  TIPOS_BATIDA,
 } from "../lib/supabase";
-
-const LABELS_PONTO = {
-  entrada: "Entrada",
-  intervalo_inicio: "Início de intervalo",
-  intervalo_fim: "Fim de intervalo",
-  saida: "Saída",
-};
+import { formatTipoBatida } from "../lib/tipoBatida";
 
 // gps → matricula → confirmar → sucesso
 export default function Ponto() {
@@ -225,8 +219,8 @@ export default function Ponto() {
             <div className="card">
               <div className="card-title">Batidas de hoje</div>
               {registrosHoje.map((r) => (
-                <div key={r.id} className="list-item-meta">
-                  {LABELS_PONTO[r.tipo]} — {format(parseISO(r.timestamp), "HH:mm:ss")}
+                <div key={r.id} className="list-item-meta tipo-batida-linha">
+                  {formatTipoBatida(r.tipo)} — {format(parseISO(r.timestamp), "HH:mm:ss")}
                 </div>
               ))}
             </div>
@@ -236,22 +230,10 @@ export default function Ponto() {
             <div className="card-title">Tipo de registro</div>
             {tipoSugerido && (
               <p className="list-item-meta" style={{ marginBottom: "0.75rem" }}>
-                Sugerido: {LABELS_PONTO[tipoSugerido]}. Altere se necessário.
+                Sugerido: {formatTipoBatida(tipoSugerido)}. Toque para alterar se necessário.
               </p>
             )}
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <select
-                className="select"
-                value={tipoSelecionado}
-                onChange={(e) => setTipoSelecionado(e.target.value)}
-              >
-                {TIPOS_BATIDA.map((t) => (
-                  <option key={t} value={t}>
-                    {LABELS_PONTO[t]}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <TipoBatidaOpcoes value={tipoSelecionado} onChange={setTipoSelecionado} grande />
           </div>
 
           <button
@@ -277,7 +259,7 @@ export default function Ponto() {
       {etapa === "sucesso" && ultimoSucesso && (
         <>
           <div className={`feedback-ponto ${ultimoSucesso.tipo}`}>
-            <h2>{LABELS_PONTO[ultimoSucesso.tipo]}</h2>
+            <h2>{formatTipoBatida(ultimoSucesso.tipo)}</h2>
             <p>{ultimoSucesso.nome}</p>
             <p>Registrado às {ultimoSucesso.horario}</p>
           </div>
