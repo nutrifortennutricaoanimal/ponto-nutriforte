@@ -253,17 +253,18 @@ export async function registrarPonto({
   const inicio = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()).toISOString();
   const fim = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 23, 59, 59, 999).toISOString();
 
-  const { data: existente } = await supabase
+  const { data: existentes, error: errCheck } = await supabase
     .from("registros_ponto")
-    .select("id, status")
+    .select("id")
     .eq("colaborador_id", colaboradorId)
     .eq("tipo", tipo)
     .eq("status", "manual")
     .gte("timestamp", inicio)
     .lte("timestamp", fim)
-    .maybeSingle();
+    .limit(1);
 
-  if (existente) throw new RegistroBloqueadoError(tipo);
+  if (errCheck) throw errCheck;
+  if (existentes?.length > 0) throw new RegistroBloqueadoError(tipo);
 
   const { data, error } = await supabase
     .from("registros_ponto")
