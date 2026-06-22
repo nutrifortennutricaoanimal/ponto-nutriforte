@@ -200,7 +200,7 @@ export async function getRegistrosHoje(colaboradorId) {
   return data || [];
 }
 
-export {
+import {
   TIPOS_BATIDA,
   TIPO_LABELS,
   TIPO_ICONES,
@@ -208,6 +208,15 @@ export {
   labelTipoBatida,
   iconeTipoBatida,
 } from "./tipoBatida";
+
+export {
+  TIPOS_BATIDA,
+  TIPO_LABELS,
+  TIPO_ICONES,
+  formatTipoBatida,
+  labelTipoBatida,
+  iconeTipoBatida,
+};
 
 export function proximoTipoPonto(ultimoRegistro) {
   if (!ultimoRegistro) return "entrada";
