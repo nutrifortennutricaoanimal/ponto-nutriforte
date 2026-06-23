@@ -94,7 +94,7 @@ function validarHorariosCrescentes(map) {
 
       if (tsA >= tsB) {
         throw new OrdemCronologicaError(
-          `Horário de ${labelTipoBatida(b.tipo)} (${formatHora(tsB)}) não pode ser anterior ou igual a ${labelTipoBatida(a.tipo)} (${formatHora(tsA)}).`
+          `Horário de ${labelTipoBatida(a.tipo)} (${formatHora(tsA)}) deve ser anterior a ${labelTipoBatida(b.tipo)} (${formatHora(tsB)}).`
         );
       }
     }
@@ -131,18 +131,6 @@ export function validarBatida({ registros, tipo, timestamp, ignorarRegistroId })
   }
 
   const tsNovo = timestamp instanceof Date ? timestamp : parseISO(timestamp);
-
-  if (lista.length > 0) {
-    const sorted = [...lista].sort(
-      (a, b) => parseISO(a.timestamp) - parseISO(b.timestamp)
-    );
-    const ultima = sorted[sorted.length - 1];
-    if (tsNovo < parseISO(ultima.timestamp)) {
-      throw new OrdemCronologicaError(
-        `O horário não pode ser anterior à última batida do dia (${formatHora(parseISO(ultima.timestamp))}).`
-      );
-    }
-  }
 
   const mapComNovo = {
     ...map,
