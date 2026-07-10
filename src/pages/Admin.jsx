@@ -126,6 +126,9 @@ function ModalRegistro({ modal, onFechar, onSalvo, colaboradoresLista = [] }) {
     try {
       parseData(data);
       if (!colaboradorId) throw new Error("Selecione o colaborador.");
+      if (modal.modo === "editar" && !modal.registro?.id) {
+        throw new Error("Registro inválido para edição.");
+      }
 
       const admin = await getAdminColaborador();
       if (!admin) throw new Error("Sessão de admin inválida.");

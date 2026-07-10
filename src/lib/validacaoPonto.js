@@ -146,6 +146,28 @@ export function validarBatida({ registros, tipo, timestamp, ignorarRegistroId, m
   validarHorariosCrescentes(mapComNovo);
 }
 
+/**
+ * Validação para edição manual pelo admin — sem trava de dia encerrado
+ * nem sequência obrigatória de batidas.
+ */
+export function validarBatidaAdmin({ registros, tipo, timestamp, ignorarRegistroId }) {
+  const lista = (registros || []).filter((r) => r.id !== ignorarRegistroId);
+  const map = mapaPorTipo(lista);
+
+  if (map[tipo]) {
+    throw new TipoDuplicadoError(tipo);
+  }
+
+  const tsNovo = timestamp instanceof Date ? timestamp : parseISO(timestamp);
+
+  const mapComNovo = {
+    ...map,
+    [tipo]: { tipo, timestamp: tsNovo.toISOString() },
+  };
+
+  validarHorariosCrescentes(mapComNovo);
+}
+
 export function isErroValidacaoPonto(err) {
   return (
     err instanceof TipoDuplicadoError ||

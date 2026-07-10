@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { startOfDay, endOfDay, parseISO } from "date-fns";
 
 import { parseData } from "./dates";
-import { validarBatida } from "./validacaoPonto";
+import { validarBatida, validarBatidaAdmin } from "./validacaoPonto";
 
 
 
@@ -416,12 +416,11 @@ export async function salvarRegistroManual({
 }) {
 
   const registros = await getRegistrosColaboradorDia(colaboradorId, timestamp);
-  validarBatida({
+  validarBatidaAdmin({
     registros,
     tipo,
     timestamp,
     ignorarRegistroId: modo === "editar" ? registroId : undefined,
-    modoAdmin: true,
   });
 
   if (modo === "criar") {
