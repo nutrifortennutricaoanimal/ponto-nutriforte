@@ -421,6 +421,7 @@ export async function salvarRegistroManual({
     tipo,
     timestamp,
     ignorarRegistroId: modo === "editar" ? registroId : undefined,
+    modoAdmin: true,
   });
 
   if (modo === "criar") {

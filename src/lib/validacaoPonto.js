@@ -114,8 +114,9 @@ function formatHora(date) {
  * @param {string} opts.tipo
  * @param {string|Date} opts.timestamp - ISO ou Date
  * @param {string} [opts.ignorarRegistroId] - ao editar, excluir o registro atual
+ * @param {boolean} [opts.modoAdmin] - admin ignora trava de dia encerrado e sequência obrigatória
  */
-export function validarBatida({ registros, tipo, timestamp, ignorarRegistroId }) {
+export function validarBatida({ registros, tipo, timestamp, ignorarRegistroId, modoAdmin = false }) {
   const lista = (registros || []).filter((r) => r.id !== ignorarRegistroId);
   const map = mapaPorTipo(lista);
 
@@ -123,11 +124,13 @@ export function validarBatida({ registros, tipo, timestamp, ignorarRegistroId })
     throw new TipoDuplicadoError(tipo);
   }
 
-  const permitidos = tiposPermitidos(lista);
-  if (!permitidos.includes(tipo)) {
-    if (map.saida) throw new DiaEncerradoError();
-    const anterior = tipoAnteriorObrigatorio(map, tipo);
-    throw new SequenciaInvalidaError(anterior || "entrada");
+  if (!modoAdmin) {
+    const permitidos = tiposPermitidos(lista);
+    if (!permitidos.includes(tipo)) {
+      if (map.saida) throw new DiaEncerradoError();
+      const anterior = tipoAnteriorObrigatorio(map, tipo);
+      throw new SequenciaInvalidaError(anterior || "entrada");
+    }
   }
 
   const tsNovo = timestamp instanceof Date ? timestamp : parseISO(timestamp);
@@ -137,7 +140,9 @@ export function validarBatida({ registros, tipo, timestamp, ignorarRegistroId })
     [tipo]: { tipo, timestamp: tsNovo.toISOString() },
   };
 
-  validarEstruturaSequencia(mapComNovo);
+  if (!modoAdmin) {
+    validarEstruturaSequencia(mapComNovo);
+  }
   validarHorariosCrescentes(mapComNovo);
 }
 
